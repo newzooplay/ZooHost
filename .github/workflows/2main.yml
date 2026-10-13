@@ -1,0 +1,60 @@
+
+name: Convert ZooPLAY to HLS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check video
+        run: test -f zooplay.mp4
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Convert video to HLS
+        run: |
+          mkdir -p public
+
+          ffmpeg -y -i zooplay.mp4 \
+            -c:v libx264 \
+            -preset veryfast \
+            -crf 23 \
+            -pix_fmt yuv420p \
+            -an \
+            -force_key_frames "expr:gte(t,n_forced*4)" \
+            -hls_time 4 \
+            -hls_playlist_type vod \
+            -hls_segment_filename \
+            "public/segment_%03d.ts" \
+            public/index.m3u8
+
+          echo "ZooPLAY HLS conversion completed"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy Pages
+        uses: actions/deploy-pages@v4
